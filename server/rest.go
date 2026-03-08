@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 /*
@@ -15,16 +16,24 @@ import (
 */
 
 // main function to start the server and init REST routes, returns relevant errors if things go wrong
-func StartREST(listeningPort int) error {
+func StartREST(listeningPort int, e chan any) {
 	mux := http.NewServeMux()
+
+	// set up our recover function to push any errors back through the asynchronous channel
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("PANIC in webserver, pushing upstream")
+			e <- r
+		}
+	}()
 
 	// Set up the HTTP routes
 
 	mux.HandleFunc("GET /", serveRoot) //
 	mux.HandleFunc("GET /notifs", serveNotifs)
 
-	http.ListenAndServe(":"+string(listeningPort), mux)
-	return nil
+	http.ListenAndServe(":"+strconv.Itoa(listeningPort), mux)
+
 }
 
 // Route handling functions

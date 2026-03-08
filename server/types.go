@@ -2,7 +2,7 @@ package main
 
 type Device struct {
 	Alias string
-	UUID  uuid
+	UUID  int
 }
 
 type Watchgroup struct {
