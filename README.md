@@ -1,0 +1,5 @@
+# Panopticon - Notifications you can't escape from
+
+Panopticon is a project built from necessity. Specifically, my stubborn brain doesn't like notifications. I've had an alarm for the last 6 months that goes off at 8pm every day to remind me to schedule for tomorrow, and I think I've paid attention to it *maybe* twice. If I want to get anywhere in life, I need to stay on top of the things that matter - Panopticon is my solution for that.
+
+Written in Go because I want to learn it, Panopticon is a notification system that hounds you on every device you own until you get things done. I'm intending for it to be lightweight enough to run on the Raspberry Pi Zero I keep in my bedroom and dispatch, manage, and update notifications to all my devices, associated in a "watchgroup." The main server runs with as few external dependencies as possible and uses a database connection to manage all the tasks and notifications. I'm making it a simple REST API to simplify the process of building clients for all the different kinds of devices I intend to use with this - I need it to be as simple as hooking into the native notification system and making some HTTP requests.
