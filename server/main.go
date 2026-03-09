@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -23,7 +24,10 @@ func readConfig(configFilepath string) map[string]any {
 	return cm
 }
 
-func startup() error {
+func startup() (*sql.DB, error) {
+	// tasks to run on startup:
+	// 1. read the config file and set the configMap to the relevant values
+	// 2.
 	defer func() {
 		// set up a process for handling panics in startup
 		if r := recover(); r != nil {
@@ -37,14 +41,15 @@ func startup() error {
 	// get the local host for logging real quick
 	hostname, err := os.Hostname()
 	if err != nil {
-		return errors.New("Couldn't get hostname")
+		return nil, errors.New("Couldn't get hostname")
 	}
 	fmt.Println("Starting up Panopticon on host", hostname)
 
 	fmt.Println("Beginning database initialization")
 	// call our connectToDatabase function to initalize the connection to the SQLite database, using a type assertion to safely pull the database filepath from the config file
+	var db *sql.DB
 	if databaseFilePath, ok := configMap["DATABASE_FILEPATH"].(string); ok {
-		db, err := connectToDatabase(databaseFilePath)
+		db, err = connectToDatabase(databaseFilePath)
 		if err != nil {
 			log.Panic("Ran into an error connecting to the SQLite database:", err)
 		}
@@ -65,12 +70,12 @@ func startup() error {
 		}
 	}()
 	fmt.Println("Startup executed without errors")
-	return nil // able to startup without any errors
+	return db, nil // able to startup without any errors
 }
 
 func main() {
 
-	startupErr := startup()
+	db, startupErr := startup()
 	if startupErr != nil {
 		fmt.Println("Fatal error during startup", startupErr)
 		os.Exit(1)
