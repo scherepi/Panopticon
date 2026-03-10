@@ -74,11 +74,18 @@ func startup() (*sql.DB, error) {
 }
 
 func main() {
-
 	db, startupErr := startup()
+	defer cleanup(db)
 	if startupErr != nil {
 		fmt.Println("Fatal error during startup", startupErr)
 		os.Exit(1)
 	}
 	fmt.Println("Locating and pinging watchgroup")
+
+}
+
+func cleanup(db *sql.DB) {
+	if err := db.Close(); err != nil {
+		log.Println("Error closing database - data may be corrupted or lost")
+	}
 }
