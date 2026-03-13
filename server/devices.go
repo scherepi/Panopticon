@@ -5,5 +5,3 @@ package main
 func setupDevices() {
 
 }
-
-func 
