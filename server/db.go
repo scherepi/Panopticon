@@ -3,7 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-
+	"os"
+	"strings"
 	_ "github.com/mattn/go-sqlite3" // blank import the sqlite3 driver to register it
 )
 
@@ -21,4 +22,15 @@ func connectToDatabase(path string) (*sql.DB, error) {
 	}
 	fmt.Println("Connected successfully to SQLite database")
 	return db, nil
+}
+
+// create tables if they don't exist
+func initSchema(db *sql.DB) {
+	schema, _ := os.ReadFile("server/database/setup.sql")
+	for _, stmt := range strings.Split(string(schema), ";") {
+		stmt = strings.TrimSpace(stmt)
+		if stmt != "" {
+			db.Exec(stmt)
+		}
+	}
 }

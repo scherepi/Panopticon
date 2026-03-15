@@ -3,3 +3,6 @@
 # make sure we're not including the actual database file lol
 *.sqlite
 *.db
+
+panopticon
+panopticon-server
