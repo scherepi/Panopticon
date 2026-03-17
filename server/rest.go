@@ -2,14 +2,12 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
-	"github.com/gin-gonic/gin" // this is a web framework for Go for building web servers and APIs
 )
-
-//using gin over net/http (WHICH IS BS BTW) bc its genuinely easier to use + powerful 
 
 /*
 	Routes and associated methods:
@@ -21,28 +19,60 @@ import (
 
 // main function to start the server and init REST routes, returns relevant errors if things go wrong
 func StartREST(listeningPort int, e chan any, db *sql.DB) {
-	router := gin.Default()
+	mux := http.NewServeMux()
 
-	router.GET("/", serveRoot)
-	router.GET("/notifs", func(context *gin.Context) { getNotifs(context, db) })
+	mux.HandleFunc("GET /", recoverHandler(e, serveRoot))
+	mux.HandleFunc("GET /notifs", recoverHandler(e, func(w http.ResponseWriter, req *http.Request) {
+		getNotifs(w, req, db)
+	}))
 	
-	router.Run(":" + strconv.Itoa(listeningPort))
+	//run server (makes sure it blocks so server keeps running)
+	addr := ":" + strconv.Itoa(listeningPort)
+	if err := http.ListenAndServe(addr, mux); err != nil {e <- err}
 }
 
-func serveRoot(context *gin.Context) {
+// wraps handler to catch panics and push them to the error channel - it wont work the prev way you had it 
+func recoverHandler(e chan any, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("PANIC in webserver, pushing upstream")
+			e <- r
+		}
+	}()
+		next(w, req)
+	}
+}
+
+
+//serve the static placeholder
+func serveRoot(w http.ResponseWriter, req *http.Request) {
+	//i think http.ServeFile would be better here but it won't have as explicit logging but idk if that's a big deal
+		// if you do wanna use it just uncomment the line below and comment out line 53-65
+	//http.ServeFile(w, req, "static/index.html")
 	body, err := os.ReadFile("static/index.html")
 	if err != nil {
 		fmt.Println("Couldn't find static file to serve on root")
-		context.String(http.StatusInternalServerError, "Internal server error")
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	context.Data(http.StatusOK, "text/html", body)
-	fmt.Println("Served static root to", context.Request.RemoteAddr)
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(body)
+	if err != nil {
+		fmt.Println("Error writing response body when serving static file")
+		return
+	}
+	fmt.Println("Served static root to", req.RemoteAddr)
 }
 
-//pull incomplete notifs from db and return them as json
-func getNotifs(context *gin.Context, db *sql.DB) {
-	rows, _ := db.Query("SELECT id, header, description, status, created_at FROM notifications WHERE status = 'pending' ORDER BY created_at DESC")
+//pulls incomplete notifs from db and returns them as json
+func getNotifs(w http.ResponseWriter, req *http.Request, db *sql.DB) {
+	rows, err := db.Query("SELECT id, header, description, status, created_at FROM notifications WHERE status = 'pending' ORDER BY created_at DESC")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	var notifs []Notification
 	for rows.Next() {
@@ -56,5 +86,13 @@ func getNotifs(context *gin.Context, db *sql.DB) {
 		rows.Scan(&notif.ID, &notif.Header, &notif.Description, &notif.Status, &notif.CreatedAt)
 		notifs = append(notifs, Notification{Header: notif.Header, Description: notif.Description})
 	}
-	context.JSON(http.StatusOK, gin.H{"data": notifs})
+	writeJSON(w, http.StatusOK, map[string]any{"data": notifs})
+	fmt.Println("Served notifs to", req.RemoteAddr)
+}
+
+//helper to write json
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }
