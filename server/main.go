@@ -14,6 +14,7 @@ import (
 	"log" // used for logging, mostly with panic and fatal
 	"os"  // necessary to create, eval, and read files
 	"strings"
+	"strconv" // for parsing
 )
 
 // function called at startup to load the config file or create one if it doesn't exist
@@ -81,8 +82,8 @@ func startup() (*sql.DB, error) {
 	}()
 
 	// create the config map for config values
-	configMap := readConfig("../panopticon.config")
-
+	configMap := readConfig("panopticon.config") // for some reason, "../" was not working for me.
+	//i dont think god intended for me to try to code in go
 	// get the local host for logging real quick
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -98,14 +99,17 @@ func startup() (*sql.DB, error) {
 		if err != nil {
 			log.Panic("Ran into an error connecting to the SQLite database:", err)
 		}
+		initSchema(db) //YOUR ASS DID NOT ADD TS
 	}
 
 	// create a channel to asynchronously collect errors (any kind of error) from the webserver
 	webErrors := make(chan any)
 	// grab the REST API port from the pre-loaded config file, with a type assertion so Go doesn't yell at me
-	if restPort, ok := configMap["REST_PORT"].(int); ok {
-		go StartREST(restPort, webErrors) // start our REST API web server with the async channel to collect errors from
+	var restPort int = 4001
+	if port, ok := configMap["REST_PORT"].(string); ok { 
+		restPort, _ = strconv.Atoi(port) 
 	}
+	go StartREST(restPort, webErrors, db) // start our REST API web server with the async channel to collect errors from
 
 	// error collection goroutine, pulls errors from the webserver and reports on any startup panics
 	go func() {
@@ -120,7 +124,10 @@ func startup() (*sql.DB, error) {
 
 func main() {
 	db, startupErr := startup() // init with startup, make sure we have our database connection and wait for any errors
-	defer cleanup(db)           // make sure we're cleaning up after ourselves when things are done, properly close the database connection
+	defer func() {
+		if db != nil {
+			cleanup(db)           // make sure we're cleaning up after ourselves when things are done, properly close the database connection
+			}}() //panics on nil with the old code
 	if startupErr != nil {
 		fmt.Println("Fatal error during startup", startupErr)
 		os.Exit(1)
@@ -129,6 +136,7 @@ func main() {
 	fmt.Println("Locating and pinging watchgroup")
 
 	// grab watchgroup info from database and ping
+	select {} // block forever so the server keeps running :p
 }
 
 func cleanup(db *sql.DB) {
